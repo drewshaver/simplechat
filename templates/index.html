@@ -24,11 +24,11 @@
       //TODO: React-y way?
       $(document).ready(function(){
         socket = io.connect();
-        socket.on('connect', function(){ console.log('request pop');
+        socket.on('connect', function(){
           socket.emit('request population');
         });
         socket.on('register population', function(){
-          if (my_username) { console.log('register pop ' + my_username);
+          if (my_username) {
             socket.emit('register me', my_username);
           }
         });
