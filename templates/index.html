@@ -13,6 +13,23 @@
       div {
         padding:4px;
       }
+      .chatBox {
+        display:inline-block;
+        height:300px;
+        width:180px;
+        position:relative;
+        overflow:hidden;
+      }
+      .chatLog {
+        position:absolute;
+        bottom:30px;
+        left:0;
+        overflow:hidden;
+      }
+      .chatForm {
+        position:absolute;
+        bottom:0;
+      }
     </style>
   </head>
   <body>
@@ -46,7 +63,6 @@
               <h1>Chat Server</h1>
               <form onSubmit={this.handleSubmit}>
                 <label>Name: <input type="text" placeholder="username" ref="username" /></label>
-                <input type="submit" value="Register" />
               </form>
             </div>
           );
@@ -64,12 +80,11 @@
           }.bind(this));
         },
         render: function() {
-          var options = this.state.users.map(function(username) {
-            return <option>{username}</option>;
-          });
           return (
             <select ref="recipient">
-              {options}
+              {this.state.users.map(function(username) {
+                return <option>{username}</option>;
+              })}
             </select>
           );
         }
@@ -87,17 +102,19 @@
           messageBox.value = '';
         },
         render: function() {
-          var history = this.props.log.map(function (message) {
-            return <p>{message}</p>;
-          });
           return (
             <div>
               <h4>{this.props.username}</h4>
-              {history}
-              <form onSubmit={this.handleSubmit}>
-                <input type="text" placeholder="message" ref="message" />
-                <input type="submit" value="Send Message" />
-              </form>
+              <div className="chatBox">
+                <div className="chatLog">
+                  {this.props.log.map(function (message) {
+                    return <p>{message}</p>;
+                  })}
+                </div>
+                <form className="chatForm" onSubmit={this.handleSubmit}>
+                  <input type="text" placeholder="message" ref="message" />
+                </form>
+              </div>
             </div>
           );
         }
@@ -138,16 +155,15 @@
           });
         },
         render: function() {
-          var convos = Object.keys(this.state).sort().map(function (username) {
-            return <Conversation username={username} log={this.state[username]} />;
-          }.bind(this));
           return (
             <div>
               <form onSubmit={this.handleSubmit}>
                 <label>Start a conversation: <Population ref="recipient" /></label>
                 <input type="submit" value="Start Conversation" />
               </form>
-              {convos}
+              {Object.keys(this.state).sort().map(function (username) {
+                return <Conversation username={username} log={this.state[username]} />;
+              }.bind(this))}
             </div>
           );
         }
