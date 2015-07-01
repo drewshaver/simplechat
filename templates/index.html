@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Chat Server</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/react.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/JSXTransformer.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <style>
+      h1 {
+        margin-top:4px;
+      }
+      div {
+        padding:4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="content"></div>
+    <script type="text/jsx">
+      var my_username;
+      var socket;
+
+      //TODO: React-y way?
+      $(document).ready(function(){
+        socket = io.connect();
+        socket.on('connect', function(){ console.log('request pop');
+          socket.emit('request population');
+        });
+        socket.on('register population', function(){
+          if (my_username) { console.log('register pop ' + my_username);
+            socket.emit('register me', my_username);
+          }
+        });
+      });
+
+      var StaticTop = React.createClass({
+        handleSubmit: function(e) {
+          e.preventDefault();
+          my_username = React.findDOMNode(this.refs.username).value;
+          socket.emit('register me', my_username);
+        },
+        render: function() {
+          return (
+            <div>
+              <h1>Chat Server</h1>
+              <form onSubmit={this.handleSubmit}>
+                <label>Name: <input type="text" placeholder="username" ref="username" /></label>
+                <input type="submit" value="Register" />
+              </form>
+            </div>
+          );
+        }
+      });
+
+      var Population = React.createClass({
+        getInitialState: function() {
+          return {users: []};
+        },
+        componentDidMount: function() {
+          //TODO is this the right spot for this?
+          socket.on('register one', function(username) {
+            this.setState({users: this.state.users.concat([username]).sort()});
+          }.bind(this));
+        },
+        render: function() {
+          var options = this.state.users.map(function(username) {
+            return <option>{username}</option>;
+          });
+          return (
+            <select ref="recipient">
+              {options}
+            </select>
+          );
+        }
+      });
+
+      var Conversation = React.createClass({
+        handleSubmit: function(e) {
+          e.preventDefault();
+          var messageBox = React.findDOMNode(this.refs.message);
+          socket.emit('message', {
+            from: my_username,
+            recipient: this.props.username,
+            message: messageBox.value
+          });
+          messageBox.value = '';
+        },
+        render: function() {
+          var history = this.props.log.map(function (message) {
+            return <p>{message}</p>;
+          });
+          return (
+            <div>
+              <h4>{this.props.username}</h4>
+              {history}
+              <form onSubmit={this.handleSubmit}>
+                <input type="text" placeholder="message" ref="message" />
+                <input type="submit" value="Send Message" />
+              </form>
+            </div>
+          );
+        }
+      });
+
+      var Conversations = React.createClass({
+        // state is map from friend username => list of messages
+        getInitialState: function() {
+          return {};
+        },
+        componentDidMount: function() {
+          socket.on('message', function(data) {
+            this.setState(function(previousState, props) { //must be a better way to do this stuff
+              var update = {};
+              var msgString = data.from + ': ' + data.message;
+              if (data.recipient == my_username) {
+                if (!(data.from in previousState))
+                  update[data.from] = [msgString];
+                else
+                  update[data.from] = previousState[data.from].concat([msgString]);
+              } else if (data.from == my_username) {
+                update[data.recipient] = previousState[data.recipient].concat([msgString]);
+              }
+              return update;
+            });
+          }.bind(this));
+        },
+        handleSubmit: function(e) {
+          e.preventDefault();
+          var recipient = React.findDOMNode(this.refs.recipient).value;
+
+          this.setState(function(previousState, props) { //better way with the extend framework / use backbone?
+            var obj = {};
+            obj[recipient] = [];
+            if (!(recipient in previousState))
+              return obj;
+            return {};
+          });
+        },
+        render: function() {
+          var convos = Object.keys(this.state).sort().map(function (username) {
+            return <Conversation username={username} log={this.state[username]} />;
+          }.bind(this));
+          return (
+            <div>
+              <form onSubmit={this.handleSubmit}>
+                <label>Start a conversation: <Population ref="recipient" /></label>
+                <input type="submit" value="Start Conversation" />
+              </form>
+              {convos}
+            </div>
+          );
+        }
+      });
+
+      React.render(
+        <div>
+          <StaticTop />
+          <Conversations />
+        </div>,
+        document.getElementById('content')
+      );
+    </script>
+  </body>
+</html>
