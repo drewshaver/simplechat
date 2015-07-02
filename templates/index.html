@@ -13,9 +13,15 @@
       div {
         padding:4px;
       }
+      a {
+        margin:6px;
+      }
+      .chatDialog {
+        display:inline-block;
+      }
       .chatBox {
         display:inline-block;
-        height:300px;
+        height:250px;
         width:180px;
         position:relative;
         overflow:hidden;
@@ -69,27 +75,6 @@
         }
       });
 
-      var Population = React.createClass({
-        getInitialState: function() {
-          return {users: []};
-        },
-        componentDidMount: function() {
-          //TODO is this the right spot for this?
-          socket.on('register one', function(username) {
-            this.setState({users: this.state.users.concat([username]).sort()});
-          }.bind(this));
-        },
-        render: function() {
-          return (
-            <select ref="recipient">
-              {this.state.users.map(function(username) {
-                return <option>{username}</option>;
-              })}
-            </select>
-          );
-        }
-      });
-
       var Conversation = React.createClass({
         handleSubmit: function(e) {
           e.preventDefault();
@@ -103,7 +88,7 @@
         },
         render: function() {
           return (
-            <div>
+            <div className="chatDialog">
               <h4>{this.props.username}</h4>
               <div className="chatBox">
                 <div className="chatLog">
@@ -115,6 +100,28 @@
                   <input type="text" placeholder="message" ref="message" />
                 </form>
               </div>
+            </div>
+          );
+        }
+      });
+
+      var Population = React.createClass({
+        getInitialState: function() {
+          return {users: []};
+        },
+        componentDidMount: function() {
+          //TODO is this the right spot for this?
+          //TODO eliminate dups and self
+          socket.on('register one', function(username) {  console.log('a');
+            this.setState({users: this.state.users.concat([username]).sort()}); console.log('b');
+          }.bind(this));
+        },
+        render: function() {
+          return (
+            <div>
+              {this.state.users.map(function(username) {
+                return <a href="#" onClick={function(){this.props.openConversation(username)}.bind(this)}>{username}</a>;
+              }.bind(this))}
             </div>
           );
         }
@@ -137,30 +144,27 @@
                   update[data.from] = previousState[data.from].concat([msgString]);
               } else if (data.from == my_username) {
                 update[data.recipient] = previousState[data.recipient].concat([msgString]);
+              } else {
+                console.log('unsolicited message');
               }
               return update;
             });
           }.bind(this));
         },
-        handleSubmit: function(e) {
-          e.preventDefault();
-          var recipient = React.findDOMNode(this.refs.recipient).value;
-
+        openConversation: function(recipient) {
           this.setState(function(previousState, props) { //better way with the extend framework / use backbone?
+            if (recipient in previousState)
+              return {};
+
             var obj = {};
             obj[recipient] = [];
-            if (!(recipient in previousState))
-              return obj;
-            return {};
+            return obj;
           });
         },
         render: function() {
           return (
             <div>
-              <form onSubmit={this.handleSubmit}>
-                <label>Start a conversation: <Population ref="recipient" /></label>
-                <input type="submit" value="Start Conversation" />
-              </form>
+              <Population openConversation={this.openConversation}/>
               {Object.keys(this.state).sort().map(function (username) {
                 return <Conversation username={username} log={this.state[username]} />;
               }.bind(this))}

@@ -1,6 +1,6 @@
 from flask import Flask
 from flask import render_template
-from flask.ext.socketio import SocketIO, emit
+from flask.ext.socketio import SocketIO, emit, join_room
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'TODO'
@@ -17,12 +17,14 @@ def request_population():
 
 @socketio.on('register me')
 def register_one(username):
+    join_room(username)
     emit('register one', username, broadcast=True)
 
 #TODO use rooms so messages aren't public
 @socketio.on('message')
 def send_message(data):
-    emit('message', data, broadcast=True)
+    emit('message', data, room=data['recipient'])
+    emit('message', data, room=data['from'])
 
 #TODO disconnect
 
