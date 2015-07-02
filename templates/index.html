@@ -16,6 +16,12 @@
       a {
         margin:6px;
       }
+      h4 {
+        margin-top:6px; display:inline-block;
+      }
+      .closeDialog {
+        float:right; display:inline-block;
+      }
       .chatDialog {
         display:inline-block;
       }
@@ -93,7 +99,7 @@
         render: function() {
           return (
             <div>
-              {Object.keys(this.state).map(function(username) {
+              {Object.keys(this.state).map(function (username) {
                 return <a href="#" onClick={this.props.openConversation(username)}>{username}</a>;
               }.bind(this))}
             </div>
@@ -116,6 +122,7 @@
           return (
             <div className="chatDialog">
               <h4>{this.props.username}</h4>
+              <a className="closeDialog" href="#" onClick={this.props.closeConversation(this.props.username)}>x</a>
               <div className="chatBox">
                 <div className="chatLog">
                   {this.props.log.map(function (message) {
@@ -168,12 +175,21 @@
             });
           }.bind(this);
         },
+        closeConversation: function(recipient) {
+          return function(e) {
+            e.preventDefault();
+            var newState = $.extend({}, true, this.state);
+            delete newState[recipient];
+            this.replaceState(newState);
+          }.bind(this);
+        },
         render: function() {
           return (
             <div>
-              <Population openConversation={this.openConversation}/>
+              <Population openConversation={this.openConversation} />
               {Object.keys(this.state).sort().map(function (username) {
-                return <Conversation username={username} log={this.state[username]} />;
+                return <Conversation username={username} log={this.state[username]}
+                                     closeConversation={this.closeConversation} />;
               }.bind(this))}
             </div>
           );
