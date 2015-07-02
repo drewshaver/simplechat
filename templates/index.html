@@ -20,17 +20,18 @@
         display:inline-block;
       }
       .chatBox {
-        display:inline-block;
         height:250px;
         width:180px;
         position:relative;
         overflow:hidden;
       }
       .chatLog {
+        width:100%;
         position:absolute;
         bottom:30px;
         left:0;
         overflow:hidden;
+        word-wrap:break-word;
       }
       .chatForm {
         position:absolute;
@@ -75,6 +76,31 @@
         }
       });
 
+      var Population = React.createClass({
+        // state is map from username => (const)1
+        getInitialState: function() {
+          return {};
+        },
+        componentDidMount: function() {
+          socket.on('register one', function(username) {
+            if (username != my_username) {
+              var obj = {}
+              obj[username] = 1;
+              this.setState(obj);
+            }
+          }.bind(this));
+        },
+        render: function() {
+          return (
+            <div>
+              {Object.keys(this.state).map(function(username) {
+                return <a href="#" onClick={this.props.openConversation(username)}>{username}</a>;
+              }.bind(this))}
+            </div>
+          );
+        }
+      });
+
       var Conversation = React.createClass({
         handleSubmit: function(e) {
           e.preventDefault();
@@ -105,28 +131,6 @@
         }
       });
 
-      var Population = React.createClass({
-        getInitialState: function() {
-          return {users: []};
-        },
-        componentDidMount: function() {
-          //TODO is this the right spot for this?
-          //TODO eliminate dups and self
-          socket.on('register one', function(username) {  console.log('a');
-            this.setState({users: this.state.users.concat([username]).sort()}); console.log('b');
-          }.bind(this));
-        },
-        render: function() {
-          return (
-            <div>
-              {this.state.users.map(function(username) {
-                return <a href="#" onClick={function(){this.props.openConversation(username)}.bind(this)}>{username}</a>;
-              }.bind(this))}
-            </div>
-          );
-        }
-      });
-
       var Conversations = React.createClass({
         // state is map from friend username => list of messages
         getInitialState: function() {
@@ -152,14 +156,17 @@
           }.bind(this));
         },
         openConversation: function(recipient) {
-          this.setState(function(previousState, props) { //better way with the extend framework / use backbone?
-            if (recipient in previousState)
-              return {};
+          return function(e) {
+            e.preventDefault();
+            this.setState(function(previousState, props) { //better way with the extend framework / use backbone?
+              if (recipient in previousState)
+                return {};
 
-            var obj = {};
-            obj[recipient] = [];
-            return obj;
-          });
+              var obj = {};
+              obj[recipient] = [];
+              return obj;
+            });
+          }.bind(this);
         },
         render: function() {
           return (
