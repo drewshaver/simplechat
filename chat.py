@@ -20,7 +20,10 @@ def register_one(username):
     join_room(username)
     emit('register one', username, broadcast=True)
 
-#TODO use rooms so messages aren't public
+@socketio.on('deregister me')
+def deregister_one(username):
+    emit('deregister one', username, broadcast=True)
+
 @socketio.on('message')
 def send_message(data):
     emit('message', data, room=data['recipient'])

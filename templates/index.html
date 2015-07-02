@@ -52,7 +52,7 @@
       var socket;
 
       //TODO: React-y way?
-      $(document).ready(function(){
+      $(document).ready(function() {
         socket = io.connect();
         socket.on('connect', function(){
           socket.emit('request population');
@@ -62,6 +62,12 @@
             socket.emit('register me', my_username);
           }
         });
+      });
+
+      $(window).unload(function() {
+        if (my_username) {
+          socket.emit('deregister me', my_username);
+        }
       });
 
       var StaticTop = React.createClass({
@@ -95,11 +101,16 @@
               this.setState(obj);
             }
           }.bind(this));
+          socket.on('deregister one', function(username) {
+            var obj = $.extend({}, true, this.state);
+            delete(obj[username]);
+            this.replaceState(obj);
+          }.bind(this));
         },
         render: function() {
           return (
             <div>
-              {Object.keys(this.state).map(function (username) {
+              {Object.keys(this.state).sort().map(function (username) {
                 return <a href="#" onClick={this.props.openConversation(username)}>{username}</a>;
               }.bind(this))}
             </div>
