@@ -17,10 +17,11 @@
         margin:6px;
       }
       h4 {
-        margin-top:6px; display:inline-block;
+        margin-top:6px;
+        display:inline-block;
       }
       .closeDialog {
-        float:right; display:inline-block;
+        float:right;
       }
       .chatDialog {
         display:inline-block;
@@ -57,13 +58,14 @@
         socket.on('connect', function(){
           socket.emit('request population');
         });
-        socket.on('register population', function(){
+        socket.on('request population', function(){
           if (my_username) {
             socket.emit('register me', my_username);
           }
         });
       });
 
+      //TODO: React-y way?
       $(window).unload(function() {
         if (my_username) {
           socket.emit('deregister me', my_username);

@@ -13,7 +13,7 @@ def index():
 #TODO better way to do simple forwarding?
 @socketio.on('request population')
 def request_population():
-    emit('register population', broadcast=True)
+    emit('request population', broadcast=True)
 
 @socketio.on('register me')
 def register_one(username):
@@ -26,12 +26,12 @@ def deregister_one(username):
 
 @socketio.on('message')
 def send_message(data):
+    #TODO can we check for receipt before confirming to sender?
     emit('message', data, room=data['recipient'])
+    
+    # Could have recorded this on the front end, but this way
+    # we at least have confirmation that it got to the server
     emit('message', data, room=data['from'])
-
-#TODO disconnect
-
-#TODO can message yourself?
 
 #TODO sanitize usernames / make sure they are encoded safely
 
