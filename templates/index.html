@@ -2,10 +2,14 @@
 <html>
   <head>
     <title>Chat Server</title>
+    <!-- TODO require.js? -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/react.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/JSXTransformer.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/0.9.16/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.2.1/backbone-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone-localstorage.js/1.1.16/backbone.localStorage-min.js"></script>
     <style>
       h1 {
         margin-top:4px;
@@ -49,8 +53,15 @@
   <body>
     <div id="content"></div>
     <script type="text/jsx">
-      var my_username;
       var socket;
+
+      var User = Backbone.Model.extend({
+        defaults: {
+          name: ''
+        },
+        localStorage: new Backbone.LocalStorage("user")
+      });
+      var user = new User({id: 1});
 
       //TODO: React-y way?
       $(document).ready(function() {
@@ -59,31 +70,46 @@
           socket.emit('request population');
         });
         socket.on('request population', function(){
-          if (my_username) {
-            socket.emit('register me', my_username);
+          if (user.get('name')) {
+            socket.emit('register me', user.get('name'));
           }
         });
       });
 
       //TODO: React-y way?
       $(window).unload(function() {
-        if (my_username) {
-          socket.emit('deregister me', my_username);
+        if (user.get('name')) {
+          socket.emit('deregister me', user.get('name'));
         }
       });
 
-      var StaticTop = React.createClass({
+      var Login = React.createClass({
+        getInitialState: function() {
+          user.fetch();
+          return {username: user.get('name')};
+        },
         handleSubmit: function(e) {
           e.preventDefault();
-          my_username = React.findDOMNode(this.refs.username).value;
-          socket.emit('register me', my_username);
+
+          user.set({name: React.findDOMNode(this.refs.username).value});
+          user.save();
+
+          socket.emit('register me', user.get('name')); //move to model?
+          this.setState({username: user.get('name')});
         },
         render: function() {
+          var extraProps = {};
+          if (this.state.username) {
+            extraProps.value = this.state.username;
+            extraProps.disabled = true;
+          }
+      
           return (
             <div>
               <h1>Chat Server</h1>
               <form onSubmit={this.handleSubmit}>
-                <label>Name: <input type="text" placeholder="username" ref="username" /></label>
+                <label>Name: <input type="text" placeholder="username" ref="username" {...extraProps} />
+                </label>
               </form>
             </div>
           );
@@ -97,7 +123,7 @@
         },
         componentDidMount: function() {
           socket.on('register one', function(username) {
-            if (username != my_username) {
+            if (username != user.get('name')) {
               var obj = {}
               obj[username] = 1;
               this.setState(obj);
@@ -128,7 +154,7 @@
           e.preventDefault();
           var messageBox = React.findDOMNode(this.refs.message);
           socket.emit('message', {
-            from: my_username,
+            from: user.get('name'),
             recipient: this.props.username,
             message: messageBox.value
           });
@@ -164,12 +190,12 @@
             this.setState(function(previousState, props) { //must be a better way to do this stuff
               var update = {};
               var msgString = data.from + ': ' + data.message;
-              if (data.recipient == my_username) {
+              if (data.recipient == user.get('name')) {
                 if (!(data.from in previousState))
                   update[data.from] = [msgString];
                 else
                   update[data.from] = previousState[data.from].concat([msgString]);
-              } else if (data.from == my_username) {
+              } else if (data.from == user.get('name')) {
                 update[data.recipient] = previousState[data.recipient].concat([msgString]);
               } else {
                 console.log('unsolicited message');
@@ -199,7 +225,10 @@
             this.replaceState(newState);
           }.bind(this);
         },
-        render: function() {
+        render: function() { /*
+          if (! user.get('name'))
+            return <p>Please login</p>; */
+
           return (
             <div>
               <Population openConversation={this.openConversation} />
@@ -214,7 +243,7 @@
 
       React.render(
         <div>
-          <StaticTop />
+          <Login />
           <Conversations />
         </div>,
         document.getElementById('content')
