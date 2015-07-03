@@ -110,6 +110,9 @@
           }.bind(this));
         },
         render: function() {
+          if (Object.keys(this.state).length == 0)
+            return <p>No Other Users Online</p>;
+
           return (
             <div>
               {Object.keys(this.state).sort().map(function (username) {
