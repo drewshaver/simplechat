@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Chat Server</title>
+
     <!-- TODO require.js? -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/react.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/JSXTransformer.js"></script>
@@ -27,7 +28,7 @@
         margin:14px 0px 8px;
       }
       h4 {
-        margin-top:6px;
+        margin:6px 2px;
         display:inline-block;
       }
       .status {
@@ -35,15 +36,19 @@
       }
       .closeDialog {
         float:right;
+        margin-top:6px;
       }
       .chatDialog {
         display:inline-block;
+        border:black solid 2px;
+        margin-top:14px;
       }
       .chatBox {
         height:250px;
         width:180px;
         position:relative;
         overflow:hidden;
+        border-top:black solid 1px;
       }
       .chatLog {
         width:100%;
@@ -58,10 +63,9 @@
         bottom:0;
       }
     </style>
-  </head>
-  <body>
-    <div id="content"></div>
-    <script type="text/jsx">
+
+    <!-- MODEL -->
+    <script type="text/javascript">
       var socket;
 
       var User = Backbone.Model.extend({
@@ -76,6 +80,14 @@
           this.save();
 
           socket.emit('register me', username) 
+        },
+
+        initialize: function() {
+          socket.on('request population', function(){
+            if (this.get('name')) {
+              socket.emit('register me', user.get('name'));
+            }
+          }.bind(this));
         }
       });
       var user;
@@ -164,7 +176,7 @@
             } else if (data.from == user.get('name')) {
               peer = data.recipient;
             } else {
-              console.log('unsolicited message');
+              console.log('misrouted message!!');
               return;
             }
 
@@ -188,7 +200,6 @@
       });
       var chatLogList;
 
-      //TODO: React-y way?
       $(document).ready(function() {
         socket = io.connect();
 
@@ -203,24 +214,23 @@
           chatLog.set({visible: false});
         });
 
-        //TODO: Race condition?
         socket.on('connect', function(){
           socket.emit('request population');
         });
-        socket.on('request population', function(){
-          if (user.get('name')) {
-            socket.emit('register me', user.get('name'));
-          }
-        });
       });
 
-      //TODO: React-y way?
       $(window).unload(function() {
         if (user.get('name')) {
           socket.emit('deregister me', user.get('name'));
         }
       });
+    </script>
+  </head>
+  <body>
+    <div id="content"></div>
 
+    <!-- VIEW -->
+    <script type="text/jsx">
       var Login = React.createClass({
         handleSubmit: function(e) {
           e.preventDefault();
@@ -228,15 +238,9 @@
         },
 
         render: function() {
-          var extraProps = {};
-          if (this.props.username) {
-            extraProps.value = this.props.username;
-            extraProps.disabled = true;
-          }
-      
           return (
             <form onSubmit={this.handleSubmit}>
-              <label>Name: <input type="text" placeholder="username" ref="username" {...extraProps} />
+              <label>Name: <input type="text" placeholder="username" ref="username" />
               </label>
             </form>
           );
@@ -295,13 +299,16 @@
                   conversations: chatLogList.visible()};
         },
         componentDidMount: function() {
+          //TODO investigate if this is best way to hook in changes
           user.on('change:name', function(model) {this.setState({username: model.get('name')});}.bind(this));
 
-          friendList.on('add', function(model) {this.setState({friendList: friendList.online()});}.bind(this));
-          friendList.on('remove', function(model) {this.setState({friendList: friendList.online()});}.bind(this));
+          var updateFriendList = function(model) {this.setState({friendList: friendList.online()});}.bind(this)
+          friendList.on('add', updateFriendList);
+          friendList.on('remove', updateFriendList);
 
-          chatLogList.on('add', function(model) {this.setState({conversations: chatLogList.visible()});}.bind(this));
-          chatLogList.on('change', function(model) {this.setState({conversations: chatLogList.visible()});}.bind(this));
+          var updateChatLogList = function(model) {this.setState({conversations: chatLogList.visible()});}.bind(this);
+          chatLogList.on('add', updateChatLogList);
+          chatLogList.on('change', updateChatLogList);
         },
         render: function() {
           var header = <h1>Chat Server</h1>;
@@ -310,7 +317,7 @@
             return (
               <div>
                 {header}
-                <Login username={this.state.username} />
+                <Login />
                 <p>Please login</p>
               </div>
             );
