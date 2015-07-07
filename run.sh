@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python chat.py
+gunicorn --worker-class 'socketio.sgunicorn.GeventSocketIOWorker' chat:app
