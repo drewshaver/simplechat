@@ -22,7 +22,7 @@
         padding:4px 2px;
       }
       a {
-        margin:0px 12px 0px 0px;
+        margin:0px 2px 0px 8px;
       }
       p {
         margin:14px 0px 8px;
@@ -254,6 +254,7 @@
 
           return (
             <div>
+              Connect:
               {this.props.friendList.map(function (friendName) {
                 return <a href="#" key={friendName}
                           onClick={function() {chatLogList.openConversation(friendName);}}>{friendName}</a>;
