@@ -11,18 +11,27 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.2.1/backbone-min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone-localstorage.js/1.1.16/backbone.localStorage-min.js"></script>
     <style>
+      body {
+        margin-left:16px;
+      }
       h1 {
-        margin-top:4px;
+        margin:4px 0px 12px;
       }
       div {
-        padding:4px;
+        padding:4px 2px;
       }
       a {
-        margin:6px;
+        margin:0px 12px 0px 0px;
+      }
+      p {
+        margin:14px 0px 8px;
       }
       h4 {
         margin-top:6px;
         display:inline-block;
+      }
+      .status {
+        margin-left:2px;
       }
       .closeDialog {
         float:right;
@@ -57,15 +66,144 @@
 
       var User = Backbone.Model.extend({
         defaults: {
-          name: ''
+          name: ""
         },
-        localStorage: new Backbone.LocalStorage("user")
+
+        localStorage: new Backbone.LocalStorage("user"),
+
+        setName: function(username) {
+          this.set({name: username});
+          this.save();
+
+          socket.emit('register me', username) 
+        }
       });
-      var user = new User({id: 1});
+      var user;
+
+      var Friend = Backbone.Model.extend({
+        defaults: {
+          name: ""
+        },
+        idAttribute: "name"
+      });
+      var FriendList = Backbone.Collection.extend({
+        model: Friend,
+
+        comparator: function(model) {
+          return model.get("name");
+        },
+
+        initialize: function() {
+          socket.on('register one', function(username) {
+            if (username != user.get('name')) {
+              this.add({name: username});
+            }
+          }.bind(this));
+
+          socket.on('deregister one', function(username) {
+            this.remove({name: username});
+          }.bind(this));
+        },
+
+        online: function() {
+          return this.map(function(model) {
+            return model.get('name');
+          });
+        }
+      });
+      var friendList;
+
+      var ChatLog = Backbone.Model.extend({
+        defaults: {
+          name: "",
+          visible: true,
+          log: []
+        },
+
+        idAttribute: "name",
+
+        appendMessage: function(messageString) {
+          this.set({log: this.get('log').concat(messageString)});
+          this.save();
+        },
+
+        sendMessage: function(message) {
+          socket.emit('message', {
+            from: user.get('name'),
+            recipient: this.get('name'),
+            message: message
+          });
+        }
+      });
+      var ChatLogList = Backbone.Collection.extend({
+        model: ChatLog,
+        localStorage: new Backbone.LocalStorage("chatLogList"),
+
+        comparator: function(model) {
+          return model.get("name");
+        },
+
+        getOrCreate: function(name) {
+          if (this.get({name: name}))
+            return this.get({name: name});
+
+          return this.add({name: name});
+        },
+
+        visible: function() {
+          return this.filter(function(chatLog) {
+            return chatLog.get('visible');
+          });
+        },
+
+        initialize: function() {
+          socket.on('message', function(data) {
+            var peer;
+            if (data.recipient == user.get('name')) {
+              peer = data.from;
+            } else if (data.from == user.get('name')) {
+              peer = data.recipient;
+            } else {
+              console.log('unsolicited message');
+              return;
+            }
+
+            var chatLog = this.getOrCreate(peer);
+            chatLog.set({visible: true});
+            chatLog.appendMessage(data.from + ': ' + data.message);
+          }.bind(this));
+
+          socket.on('deregister one', function(username) {
+            this.getOrCreate(username).set({visible: false});
+          }.bind(this));
+        },
+
+        openConversation: function(name) {
+          this.getOrCreate(name).set({visible: true});
+        },
+
+        closeConversation: function(name) {
+          this.getOrCreate(name).set({visible: false});
+        }
+      });
+      var chatLogList;
 
       //TODO: React-y way?
       $(document).ready(function() {
         socket = io.connect();
+
+        user = new User({id: 1});
+        user.fetch();
+
+        friendList = new FriendList();
+
+        chatLogList = new ChatLogList();
+        chatLogList.fetch();
+        chatLogList.each(function (chatLog) {
+          chatLog.set({visible: false});
+        });
+
+        //TODO: Race condition?
         socket.on('connect', function(){
           socket.emit('request population');
         });
@@ -84,66 +222,38 @@
       });
 
       var Login = React.createClass({
-        getInitialState: function() {
-          user.fetch();
-          return {username: user.get('name')};
-        },
         handleSubmit: function(e) {
           e.preventDefault();
-
-          user.set({name: React.findDOMNode(this.refs.username).value});
-          user.save();
-
-          socket.emit('register me', user.get('name')); //move to model?
-          this.setState({username: user.get('name')});
+          user.setName(React.findDOMNode(this.refs.username).value);
         },
+
         render: function() {
           var extraProps = {};
-          if (this.state.username) {
-            extraProps.value = this.state.username;
+          if (this.props.username) {
+            extraProps.value = this.props.username;
             extraProps.disabled = true;
           }
       
           return (
-            <div>
-              <h1>Chat Server</h1>
-              <form onSubmit={this.handleSubmit}>
-                <label>Name: <input type="text" placeholder="username" ref="username" {...extraProps} />
-                </label>
-              </form>
-            </div>
+            <form onSubmit={this.handleSubmit}>
+              <label>Name: <input type="text" placeholder="username" ref="username" {...extraProps} />
+              </label>
+            </form>
           );
         }
       });
 
       var Population = React.createClass({
-        // state is map from username => (const)1
-        getInitialState: function() {
-          return {};
-        },
-        componentDidMount: function() {
-          socket.on('register one', function(username) {
-            if (username != user.get('name')) {
-              var obj = {}
-              obj[username] = 1;
-              this.setState(obj);
-            }
-          }.bind(this));
-          socket.on('deregister one', function(username) {
-            var obj = $.extend({}, true, this.state);
-            delete(obj[username]);
-            this.replaceState(obj);
-          }.bind(this));
-        },
         render: function() {
-          if (Object.keys(this.state).length == 0)
-            return <p>No Other Users Online</p>;
+          if (this.props.friendList.length == 0)
+            return <p className="status">No Other Users Online</p>;
 
           return (
             <div>
-              {Object.keys(this.state).sort().map(function (username) {
-                return <a href="#" onClick={this.props.openConversation(username)}>{username}</a>;
-              }.bind(this))}
+              {this.props.friendList.map(function (friendName) {
+                return <a href="#" key={friendName}
+                          onClick={function() {chatLogList.openConversation(friendName);}}>{friendName}</a>;
+              })}
             </div>
           );
         }
@@ -152,23 +262,21 @@
       var Conversation = React.createClass({
         handleSubmit: function(e) {
           e.preventDefault();
-          var messageBox = React.findDOMNode(this.refs.message);
-          socket.emit('message', {
-            from: user.get('name'),
-            recipient: this.props.username,
-            message: messageBox.value
-          });
+          var messageBox = React.findDOMNode(this.refs.message)
+          this.props.model.sendMessage(messageBox.value);
           messageBox.value = '';
         },
+
         render: function() {
           return (
             <div className="chatDialog">
-              <h4>{this.props.username}</h4>
-              <a className="closeDialog" href="#" onClick={this.props.closeConversation(this.props.username)}>x</a>
+              <h4>{this.props.model.get('name')}</h4>
+              <a className="closeDialog" href="#"
+                 onClick={function() {this.props.model.set({visible: false})}.bind(this)}>x</a>
               <div className="chatBox">
                 <div className="chatLog">
-                  {this.props.log.map(function (message) {
-                    return <p>{message}</p>;
+                  {this.props.model.get('log').map(function (message, index) {
+                    return <p key={index}>{message}</p>;
                   })}
                 </div>
                 <form className="chatForm" onSubmit={this.handleSubmit}>
@@ -180,74 +288,47 @@
         }
       });
 
-      var Conversations = React.createClass({
-        // state is map from friend username => list of messages
+      var Main = React.createClass({
         getInitialState: function() {
-          return {};
+          return {username: user.get('name'),
+                  friendList: friendList.online(),
+                  conversations: chatLogList.visible()};
         },
         componentDidMount: function() {
-          socket.on('message', function(data) {
-            this.setState(function(previousState, props) { //must be a better way to do this stuff
-              var update = {};
-              var msgString = data.from + ': ' + data.message;
-              if (data.recipient == user.get('name')) {
-                if (!(data.from in previousState))
-                  update[data.from] = [msgString];
-                else
-                  update[data.from] = previousState[data.from].concat([msgString]);
-              } else if (data.from == user.get('name')) {
-                update[data.recipient] = previousState[data.recipient].concat([msgString]);
-              } else {
-                console.log('unsolicited message');
-              }
-              return update;
-            });
-          }.bind(this));
-        },
-        openConversation: function(recipient) {
-          return function(e) {
-            e.preventDefault();
-            this.setState(function(previousState, props) { //better way with the extend framework / use backbone?
-              if (recipient in previousState)
-                return {};
+          user.on('change:name', function(model) {this.setState({username: model.get('name')});}.bind(this));
 
-              var obj = {};
-              obj[recipient] = [];
-              return obj;
-            });
-          }.bind(this);
+          friendList.on('add', function(model) {this.setState({friendList: friendList.online()});}.bind(this));
+          friendList.on('remove', function(model) {this.setState({friendList: friendList.online()});}.bind(this));
+
+          chatLogList.on('add', function(model) {this.setState({conversations: chatLogList.visible()});}.bind(this));
+          chatLogList.on('change', function(model) {this.setState({conversations: chatLogList.visible()});}.bind(this));
         },
-        closeConversation: function(recipient) {
-          return function(e) {
-            e.preventDefault();
-            var newState = $.extend({}, true, this.state);
-            delete newState[recipient];
-            this.replaceState(newState);
-          }.bind(this);
-        },
-        render: function() { /*
-          if (! user.get('name'))
-            return <p>Please login</p>; */
+        render: function() {
+          var header = <h1>Chat Server</h1>;
+
+          if (! this.state.username)
+            return (
+              <div>
+                {header}
+                <Login username={this.state.username} />
+                <p>Please login</p>
+              </div>
+            );
 
           return (
             <div>
-              <Population openConversation={this.openConversation} />
-              {Object.keys(this.state).sort().map(function (username) {
-                return <Conversation username={username} log={this.state[username]}
-                                     closeConversation={this.closeConversation} />;
-              }.bind(this))}
+              {header}
+              <p className="status">Logged in as: <b>{this.state.username}</b></p>
+              <Population friendList={this.state.friendList} />
+              {this.state.conversations.map(function (chatLog) {
+                return <Conversation model={chatLog} key={chatLog.get('name')} />;
+              })}
             </div>
           );
         }
       });
 
-      React.render(
-        <div>
-          <Login />
-          <Conversations />
-        </div>,
-        document.getElementById('content')
-      );
+      React.render(<Main />, document.getElementById('content'));
     </script>
   </body>
 </html>
