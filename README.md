@@ -3,6 +3,12 @@
 * Server code is in `chat.py`
 * Client code is in `templates/index.html`
 
+# Requirements
+
+* Python
+* pip (`easy_install pip`)
+* libs (`pip install -r requirements.txt`)
+
 # How to run
 
 * `./run.sh`
